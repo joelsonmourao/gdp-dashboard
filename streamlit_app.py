@@ -1,151 +1,76 @@
 import streamlit as st
 import pandas as pd
-import math
-from pathlib import Path
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
+st.set_page_config(page_title="Painel de Taxa de Entrega", layout="wide")
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+st.title("📊 Painel de Taxa de Entrega")
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+# Upload manual
+arquivo = st.file_uploader("Carregar planilha de dados", type=["xlsx", "csv"])
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+if arquivo is not None:
+    if arquivo.name.endswith(".csv"):
+        df = pd.read_csv(arquivo, dtype={"Pedido": str})
+    else:
+        df = pd.read_excel(arquivo, dtype={"Pedido": str})
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+    # ---------------- Filtros ----------------
+    st.sidebar.header("Filtros")
+    base = st.sidebar.multiselect("Selecione a Base de entrega:", df["Base de entrega"].unique())
+    cidade = st.sidebar.multiselect("Selecione a Cidade Destino:", df["Cidade Destino"].unique())
+    entregador = st.sidebar.multiselect("Selecione o Entregador:", df["Entregador"].dropna().unique())
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
+    df_filtrado = df.copy()
+    if base:
+        df_filtrado = df_filtrado[df_filtrado["Base de entrega"].isin(base)]
+    if cidade:
+        df_filtrado = df_filtrado[df_filtrado["Cidade Destino"].isin(cidade)]
+    if entregador:
+        df_filtrado = df_filtrado[df_filtrado["Entregador"].isin(entregador)]
 
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
+    # ---------------- KPIs ----------------
+    col1, col2, col3, col4 = st.columns(4)
+    total_pedidos = len(df_filtrado)
+    entregues = df_filtrado["Recebimento"].eq("Sim").sum()  # se "Sim" = entregue
+    problematicos = df_filtrado["Problemático"].notna().sum()
+    taxa_entrega = (entregues / total_pedidos * 100) if total_pedidos > 0 else 0
 
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
+    col1.metric("📦 Total de Pedidos", total_pedidos)
+    col2.metric("✅ Entregues", entregues)
+    col3.metric("⚠️ Problemáticos", problematicos)
+    col4.metric("📈 Taxa de Entrega", f"{taxa_entrega:.2f}%")
 
-    return gdp_df
+    # ---------------- Tabela completa ----------------
+    st.subheader("📍 Detalhes dos Pedidos")
+    st.dataframe(df_filtrado, use_container_width=True)
 
-gdp_df = get_gdp_data()
-
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
-
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
+    # ---------------- Resumo por Base ----------------
+    st.subheader("📊 Taxa por Base de entrega")
+    df_base = (
+        df_filtrado.groupby("Base de entrega")
+        .agg(
+            Pedidos=("Pedido", "count"),
+            Entregues=("Recebimento", lambda x: (x == "Sim").sum()),
+            Problemáticos=("Problemático", "count"),
         )
+    )
+    df_base["Taxa de Entrega (%)"] = (df_base["Entregues"] / df_base["Pedidos"]) * 100
+    st.dataframe(df_base, use_container_width=True)
+    st.bar_chart(df_base["Taxa de Entrega (%)"])
+
+    # ---------------- Resumo por Entregador ----------------
+    st.subheader("👷 Taxa por Entregador")
+    df_entregador = (
+        df_filtrado.groupby("Entregador")
+        .agg(
+            Pedidos=("Pedido", "count"),
+            Entregues=("Recebimento", lambda x: (x == "Sim").sum()),
+            Problemáticos=("Problemático", "count"),
+        )
+    )
+    df_entregador["Taxa de Entrega (%)"] = (df_entregador["Entregues"] / df_entregador["Pedidos"]) * 100
+    st.dataframe(df_entregador, use_container_width=True)
+    st.bar_chart(df_entregador["Taxa de Entrega (%)"])
+
+else:
+    st.info("📂 Carregue uma planilha para visualizar os dados")
