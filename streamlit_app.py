@@ -1,41 +1,52 @@
 import streamlit as st
 import pandas as pd
-import requests
-import io
 
-st.set_page_config(page_title="Painel de Taxa de Entrega", layout="wide")
+# --- Resumo por Entregador com Taxa ---
+st.subheader("📊 Taxa de Entrega por Entregador")
 
-st.title("📊 Painel de Taxa de Entrega")
+df_taxa = (
+    df_filtrado.groupby("Entregador")
+    .agg(
+        **{
+            "NÃO ENTREGUE": ("Recebimento", lambda x: (x != "Sim").sum()),
+            "ENTREGUE": ("Recebimento", lambda x: (x == "Sim").sum()),
+            "TOTAL": ("Pedido", "count"),
+        }
+    )
+    .reset_index()
+)
 
-# 🔹 Link direto do Google Sheets para baixar como .xlsx
-google_sheets_url = "https://docs.google.com/spreadsheets/d/1pik6-AIg3g6fzR0vLrHDPUzV7IOruDtP/export?format=xlsx"
+# Calcular taxa
+df_taxa["TAXA %"] = (df_taxa["ENTREGUE"] / df_taxa["TOTAL"] * 100).round(2)
 
-@st.cache_data
-def carregar_dados(uploaded_file=None):
-    try:
-        if uploaded_file is not None:
-            # Se o usuário fizer upload manual
-            return pd.read_excel(uploaded_file, dtype={"Pedido": str})
-        else:
-            # Caso contrário, baixa direto do Google Sheets
-            res = requests.get(google_sheets_url)
-            res.raise_for_status()
-            return pd.read_excel(io.BytesIO(res.content), dtype={"Pedido": str})
-    except Exception as e:
-        st.error(f"❌ Erro ao carregar dados: {e}")
-        return None
+# Função para colorir
+def cor_taxa(val):
+    if val >= 98:
+        color = "background-color: #00B050; color: white"  # Verde
+    elif val >= 95:
+        color = "background-color: #FFC000; color: black"  # Amarelo
+    else:
+        color = "background-color: #FF0000; color: white"  # Vermelho
+    return color
 
-# Carrega automaticamente do Google Sheets
-df = carregar_dados()
+# Aplicar estilo
+st.dataframe(
+    df_taxa.style
+    .format({"TAXA %": "{:.2f}%"})
+    .applymap(cor_taxa, subset=["TAXA %"]),
+    use_container_width=True
+)
 
-if df is not None:
-    st.success("✅ Dados carregados com sucesso do Google Sheets!")
-    st.dataframe(df.head(), use_container_width=True)
-else:
-    st.warning("⚠️ Nenhum dado disponível. Carregue uma planilha manualmente.")
-    uploaded_file = st.file_uploader("📂 Carregar planilha manualmente", type=["xlsx", "csv"])
-    if uploaded_file:
-        df = carregar_dados(uploaded_file)
-        if df is not None:
-            st.success("✅ Dados carregados com sucesso do arquivo enviado!")
-            st.dataframe(df.head(), use_container_width=True)
+# Totais
+total_nao_entregue = df_taxa["NÃO ENTREGUE"].sum()
+total_entregue = df_taxa["ENTREGUE"].sum()
+total_geral = df_taxa["TOTAL"].sum()
+taxa_geral = (total_entregue / total_geral * 100).round(2) if total_geral > 0 else 0
+
+st.markdown(f"""
+### 📌 Total Geral
+- **Não entregue:** {total_nao_entregue}  
+- **Entregue:** {total_entregue}  
+- **Total:** {total_geral}  
+- **Taxa Geral:** {taxa_geral:.2f}%  
+""")
