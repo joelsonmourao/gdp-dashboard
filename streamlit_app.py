@@ -19,7 +19,6 @@ def carregar_dados(uploaded_file=None):
         if uploaded_file is not None:
             return pd.read_excel(uploaded_file, dtype={"Pedido": str})
         else:
-            # Tenta baixar do Google Drive
             res = requests.get(google_drive_url)
             if res.status_code == 200:
                 return pd.read_excel(io.BytesIO(res.content), dtype={"Pedido": str})
@@ -33,7 +32,6 @@ df = carregar_dados()
 
 if df is not None and not df.empty:
     st.success("✅ Dados carregados com sucesso do Google Drive!")
-    st.dataframe(df.head(), use_container_width=True)
 
     # ---------------- Normalização de Recebimento ----------------
     def classificar_recebimento(valor):
@@ -45,6 +43,26 @@ if df is not None and not df.empty:
             return "NÃO ENTREGUE"
 
     df["StatusEntrega"] = df["Recebimento"].apply(classificar_recebimento)
+
+    # ---------------- Filtro por Base ----------------
+    st.sidebar.header("Filtros")
+    bases = st.sidebar.multiselect("Selecione a Base de Entrega:", df["Base de entrega"].unique())
+    
+    if bases:
+        df = df[df["Base de entrega"].isin(bases)]
+
+    # ---------------- Botão para baixar Excel ----------------
+    st.sidebar.subheader("📥 Exportar")
+    excel_bytes = io.BytesIO()
+    df.to_excel(excel_bytes, index=False, engine="openpyxl")
+    excel_bytes.seek(0)
+
+    st.sidebar.download_button(
+        label="⬇️ Baixar planilha filtrada (Excel)",
+        data=excel_bytes,
+        file_name="dados_filtrados.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
     # ---------------- KPIs ----------------
     col1, col2, col3, col4 = st.columns(4)
@@ -75,14 +93,13 @@ if df is not None and not df.empty:
 
     df_base["TAXA %"] = (df_base["ENTREGUE"] / df_base["TOTAL"] * 100).round(2)
 
-    # Função para cores
     def cor_taxa(val):
         if val >= 98:
-            return "background-color: #00B050; color: white"  # Verde
+            return "background-color: #00B050; color: white"
         elif val >= 95:
-            return "background-color: #FFC000; color: black"  # Amarelo
+            return "background-color: #FFC000; color: black"
         else:
-            return "background-color: #FF0000; color: white"  # Vermelho
+            return "background-color: #FF0000; color: white"
 
     st.dataframe(
         df_base.style
