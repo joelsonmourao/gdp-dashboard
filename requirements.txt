@@ -1,6 +1,6 @@
 streamlit
 pandas
-requests
-openpyxl
 numpy
+openpyxl
+requests
 altair
