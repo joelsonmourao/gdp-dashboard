@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 import io
-import dataframe_image as dfi
-from PIL import Image
 
 st.set_page_config(page_title="Painel de Taxa de Entrega", layout="wide")
 
@@ -78,29 +76,6 @@ if df is not None and not df.empty:
     col3.metric("❌ Não Entregues", nao_entregues)
     col4.metric("📈 Taxa de Entrega", f"{taxa_entrega:.2f}%")
 
-    # ---------------- Funções auxiliares ----------------
-    def cor_taxa(val):
-        if val >= 98:
-            return "background-color: #00B050; color: white"
-        elif val >= 95:
-            return "background-color: #FFC000; color: black"
-        else:
-            return "background-color: #FF0000; color: white"
-
-    def estilo_base(val):
-        return "font-weight: bold; color: black; background-color: #F2F2F2"
-
-    estilo_header = [
-        {"selector": "th", "props": [("font-weight", "bold"),
-                                     ("background-color", "#D9D9D9"),
-                                     ("color", "black"),
-                                     ("text-align", "center")]}
-    ]
-
-    def salvar_tabela_png(df_styled, nome_arquivo):
-        dfi.export(df_styled, nome_arquivo)
-        return nome_arquivo
-
     # ---------------- Taxa por Base ----------------
     st.subheader("🏢 Taxa de Entrega por Base de Entrega")
 
@@ -117,7 +92,30 @@ if df is not None and not df.empty:
     )
 
     df_base["TAXA %"] = (df_base["ENTREGUE"] / df_base["TOTAL"] * 100).round(2)
+
+    # 👉 Ordenar do menor para o maior
     df_base = df_base.sort_values(by="TAXA %", ascending=True)
+
+    # Função para cores na coluna Taxa
+    def cor_taxa(val):
+        if val >= 98:
+            return "background-color: #00B050; color: white"
+        elif val >= 95:
+            return "background-color: #FFC000; color: black"
+        else:
+            return "background-color: #FF0000; color: white"
+
+    # Função para destacar a 1ª coluna (linhas)
+    def estilo_base(val):
+        return "font-weight: bold; color: black; background-color: #F2F2F2"
+
+    # Estilo para o cabeçalho
+    estilo_header = [
+        {"selector": "th", "props": [("font-weight", "bold"),
+                                     ("background-color", "#D9D9D9"),
+                                     ("color", "black"),
+                                     ("text-align", "center")]}
+    ]
 
     tabela_base = (
         df_base.style
@@ -125,16 +123,10 @@ if df is not None and not df.empty:
         .applymap(cor_taxa, subset=["TAXA %"])
         .applymap(estilo_base, subset=["Base de entrega"])
         .set_table_styles(estilo_header)
-        .hide(axis="index")
+        .hide(axis="index")  # <<< remove o índice
     )
 
     st.table(tabela_base)
-
-    # Botão para baixar PNG da tabela de base
-    if st.button("📸 Baixar PNG - Taxa por Base"):
-        arquivo = salvar_tabela_png(tabela_base, "taxa_base.png")
-        with open(arquivo, "rb") as f:
-            st.download_button("⬇️ Download Taxa por Base (PNG)", f, file_name="taxa_base.png")
 
     # ---------------- Taxa por Entregador ----------------
     st.subheader("👷 Taxa de Entrega por Entregador")
@@ -152,6 +144,8 @@ if df is not None and not df.empty:
     )
 
     df_ent["TAXA %"] = (df_ent["ENTREGUE"] / df_ent["TOTAL"] * 100).round(2)
+
+    # 👉 Ordenar do menor para o maior
     df_ent = df_ent.sort_values(by="TAXA %", ascending=True)
 
     tabela_ent = (
@@ -159,16 +153,10 @@ if df is not None and not df.empty:
         .format({"TAXA %": "{:.2f}%"})
         .applymap(cor_taxa, subset=["TAXA %"])
         .set_table_styles(estilo_header)
-        .hide(axis="index")
+        .hide(axis="index")  # <<< remove o índice
     )
 
     st.table(tabela_ent)
-
-    # Botão para baixar PNG da tabela de entregador
-    if st.button("📸 Baixar PNG - Taxa por Entregador"):
-        arquivo = salvar_tabela_png(tabela_ent, "taxa_entregador.png")
-        with open(arquivo, "rb") as f:
-            st.download_button("⬇️ Download Taxa por Entregador (PNG)", f, file_name="taxa_entregador.png")
 
     # ---------------- Totais ----------------
     total_nao_entregue = df_ent["NÃO ENTREGUE"].sum()
