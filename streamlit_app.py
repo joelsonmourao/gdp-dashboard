@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 import io
-import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Painel de Taxa de Entrega", layout="wide")
 
@@ -40,8 +39,6 @@ if df is not None and not df.empty:
             return "NÃO ENTREGUE"
         elif "assinatura normal" in str(valor).lower():
             return "ENTREGUE"
-        elif "na base" in str(valor).lower():
-            return "NA BASE"
         else:
             return "NÃO ENTREGUE"
 
@@ -72,13 +69,12 @@ if df is not None and not df.empty:
     total_pedidos = len(df)
     entregues = (df["StatusEntrega"] == "ENTREGUE").sum()
     nao_entregues = (df["StatusEntrega"] == "NÃO ENTREGUE").sum()
-    na_base = (df["StatusEntrega"] == "NA BASE").sum()
     taxa_entrega = (entregues / total_pedidos * 100) if total_pedidos > 0 else 0
 
     col1.metric("📦 Total de Pedidos", total_pedidos)
     col2.metric("✅ Entregues", entregues)
     col3.metric("❌ Não Entregues", nao_entregues)
-    col4.metric("📊 Na Base", na_base)
+    col4.metric("📈 Taxa de Entrega", f"{taxa_entrega:.2f}%")
 
     # ---------------- Taxa por Base ----------------
     st.subheader("🏢 Taxa de Entrega por Base de Entrega")
@@ -89,7 +85,6 @@ if df is not None and not df.empty:
             **{
                 "NÃO ENTREGUE": ("StatusEntrega", lambda x: (x == "NÃO ENTREGUE").sum()),
                 "ENTREGUE": ("StatusEntrega", lambda x: (x == "ENTREGUE").sum()),
-                "NA BASE": ("StatusEntrega", lambda x: (x == "NA BASE").sum()),
                 "TOTAL": ("Pedido", "count"),
             }
         )
@@ -106,41 +101,12 @@ if df is not None and not df.empty:
         else:
             return "background-color: #FF0000; color: white"
 
-    # 👉 Deixar cabeçalhos em negrito
     st.dataframe(
         df_base.style
-        .set_table_styles([{"selector": "th", "props": [("font-weight", "bold")]}])
-        .format({"TAXA %": "{:.2f}%"}).applymap(cor_taxa, subset=["TAXA %"]),
+        .format({"TAXA %": "{:.2f}%"})
+        .applymap(cor_taxa, subset=["TAXA %"]),
         use_container_width=True
     )
-
-    # ---------------- Pedidos na Base ----------------
-    st.subheader("📍 Pedidos que estão NA BASE")
-
-    df_na_base = df[df["StatusEntrega"] == "NA BASE"]
-
-    if not df_na_base.empty:
-        st.write(df_na_base[["Pedido", "Base de entrega", "Cidade Destino", "Entregador"]])
-
-        # Gráfico
-        fig, ax = plt.subplots(figsize=(8, 4))
-        df_na_base["Base de entrega"].value_counts().plot(kind="bar", ax=ax, color="red")
-        ax.set_title("Pedidos NA BASE por Base de Entrega", fontsize=14, fontweight="bold")
-        ax.set_ylabel("Quantidade")
-        st.pyplot(fig)
-
-        # Botão para baixar gráfico em PNG
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png")
-        st.download_button(
-            label="⬇️ Baixar gráfico NA BASE (PNG)",
-            data=buf.getvalue(),
-            file_name="pedidos_na_base.png",
-            mime="image/png"
-        )
-
-    else:
-        st.info("✅ Nenhum pedido está na BASE.")
 
     # ---------------- Taxa por Entregador ----------------
     st.subheader("👷 Taxa de Entrega por Entregador")
@@ -161,8 +127,8 @@ if df is not None and not df.empty:
 
     st.dataframe(
         df_ent.style
-        .set_table_styles([{"selector": "th", "props": [("font-weight", "bold")]}])
-        .format({"TAXA %": "{:.2f}%"}).applymap(cor_taxa, subset=["TAXA %"]),
+        .format({"TAXA %": "{:.2f}%"})
+        .applymap(cor_taxa, subset=["TAXA %"]),
         use_container_width=True
     )
 
