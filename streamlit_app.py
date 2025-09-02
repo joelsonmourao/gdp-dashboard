@@ -93,6 +93,9 @@ if df is not None and not df.empty:
 
     df_base["TAXA %"] = (df_base["ENTREGUE"] / df_base["TOTAL"] * 100).round(2)
 
+    # 👉 Ordenar do menor para o maior
+    df_base = df_base.sort_values(by="TAXA %", ascending=True)
+
     # Função para cores na coluna Taxa
     def cor_taxa(val):
         if val >= 98:
@@ -114,14 +117,16 @@ if df is not None and not df.empty:
                                      ("text-align", "center")]}
     ]
 
-    st.dataframe(
+    tabela_base = (
         df_base.style
         .format({"TAXA %": "{:.2f}%"})
         .applymap(cor_taxa, subset=["TAXA %"])
         .applymap(estilo_base, subset=["Base de entrega"])
-        .set_table_styles(estilo_header),
-        use_container_width=True
+        .set_table_styles(estilo_header)
+        .hide(axis="index")  # <<< remove o índice
     )
+
+    st.table(tabela_base)
 
     # ---------------- Taxa por Entregador ----------------
     st.subheader("👷 Taxa de Entrega por Entregador")
@@ -140,13 +145,18 @@ if df is not None and not df.empty:
 
     df_ent["TAXA %"] = (df_ent["ENTREGUE"] / df_ent["TOTAL"] * 100).round(2)
 
-    st.dataframe(
+    # 👉 Ordenar do menor para o maior
+    df_ent = df_ent.sort_values(by="TAXA %", ascending=True)
+
+    tabela_ent = (
         df_ent.style
         .format({"TAXA %": "{:.2f}%"})
         .applymap(cor_taxa, subset=["TAXA %"])
-        .set_table_styles(estilo_header),
-        use_container_width=True
+        .set_table_styles(estilo_header)
+        .hide(axis="index")  # <<< remove o índice
     )
+
+    st.table(tabela_ent)
 
     # ---------------- Totais ----------------
     total_nao_entregue = df_ent["NÃO ENTREGUE"].sum()
