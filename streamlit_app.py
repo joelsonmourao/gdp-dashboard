@@ -93,6 +93,7 @@ if df is not None and not df.empty:
 
     df_base["TAXA %"] = (df_base["ENTREGUE"] / df_base["TOTAL"] * 100).round(2)
 
+    # Função para cores na coluna Taxa
     def cor_taxa(val):
         if val >= 98:
             return "background-color: #00B050; color: white"
@@ -101,10 +102,24 @@ if df is not None and not df.empty:
         else:
             return "background-color: #FF0000; color: white"
 
+    # Função para destacar a 1ª coluna (linhas)
+    def estilo_base(val):
+        return "font-weight: bold; color: black; background-color: #F2F2F2"
+
+    # Estilo para o cabeçalho
+    estilo_header = [
+        {"selector": "th", "props": [("font-weight", "bold"),
+                                     ("background-color", "#D9D9D9"),
+                                     ("color", "black"),
+                                     ("text-align", "center")]}
+    ]
+
     st.dataframe(
         df_base.style
         .format({"TAXA %": "{:.2f}%"})
-        .applymap(cor_taxa, subset=["TAXA %"]),
+        .applymap(cor_taxa, subset=["TAXA %"])
+        .applymap(estilo_base, subset=["Base de entrega"])
+        .set_table_styles(estilo_header),
         use_container_width=True
     )
 
@@ -128,7 +143,8 @@ if df is not None and not df.empty:
     st.dataframe(
         df_ent.style
         .format({"TAXA %": "{:.2f}%"})
-        .applymap(cor_taxa, subset=["TAXA %"]),
+        .applymap(cor_taxa, subset=["TAXA %"])
+        .set_table_styles(estilo_header),
         use_container_width=True
     )
 
